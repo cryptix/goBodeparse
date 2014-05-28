@@ -2,19 +2,14 @@ package main
 
 import (
 	"encoding/csv"
-	"io/ioutil"
 	"log"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 	"os"
-	"regexp"
 	"strconv"
+	"sync"
 )
 
 var (
-	loginCheckRegexp   = regexp.MustCompile(`(angemeldet!)`)
-	warengruppenRegexp = regexp.MustCompile(`loadProductPage.php\?wg=([\w-]+)">`)
+	wg sync.WaitGroup
 )
 
 type Artikel struct {
@@ -22,77 +17,63 @@ type Artikel struct {
 	Kategorie    string
 }
 
+func mergeWorkers(cs ...<-chan Artikel) <-chan Artikel {
+	var wg sync.WaitGroup
+	out := make(chan Artikel)
+
+	output := func(c <-chan Artikel) {
+		for a := range c {
+			out <- a
+		}
+		wg.Done()
+	}
+
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
 func main() {
 
-	// preserve cookies from the response
-	jar, err := cookiejar.New(nil)
-	checkErr(err)
-
-	client := http.Client{nil, nil, jar}
-
-	// try to log in
-	loginCreds := url.Values{
-		"Kunde":     []string{user},
-		"Pass":      []string{passw},
-		"sentLogin": []string{"1"},
+	// start the workers!
+	jobs, client, err := loginAndGetWarengruppen(user, passw)
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	resp, err := client.PostForm("http://bodenaturkost.de/php/loadPage.php", loginCreds)
-	checkErr(err)
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		log.Fatalf("Login Status Code: %v\n", resp.StatusCode)
-	}
-
-	loginBody, err := ioutil.ReadAll(resp.Body)
-	checkErr(err)
-
-	if loginCheckRegexp.Match(loginBody) == false {
-		log.Fatal("Login gescheitert.\n")
-	}
-
 	log.Printf("Logged in!\n")
 
-	// start the workers!
-	jobs := make(chan string, 50) // ~35 categories on the catalog currently
-	artikel := make(chan *Artikel, 100)
+	workerChans := make([]<-chan Artikel, 4)
 
 	for i := 0; i < 4; i++ {
-		go kategorieWorker(client, jobs, artikel)
+		workerChans[i] = kategorieWorker(client, jobs)
 	}
 
-	// find all categories from the landing page
-	for _, gruppe := range warengruppenRegexp.FindAllStringSubmatch(string(loginBody), -1) {
-		if len(gruppe) != 2 {
-			log.Fatalf("Strange Warengruppe:%v\n", gruppe)
-		}
-
-		// send categorie to the workers
-		jobs <- gruppe[1]
-	}
-	close(jobs) // no more categories to parse
+	artikels := mergeWorkers(workerChans...)
 
 	// prepare the output file
 	file, err := os.Create("bode.csv")
-	checkErr(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer file.Close()
 
 	bodecsv := csv.NewWriter(file)
 
-	// read all the articles from the chanel
-	for arti := range artikel {
+	for a := range artikels {
 		rec := []string{
-			strconv.Itoa(arti.ArtNr),
-			strconv.Itoa(arti.Preis),
-			arti.Kategorie}
+			strconv.Itoa(a.ArtNr),
+			strconv.Itoa(a.Preis),
+			a.Kategorie}
 		log.Printf("Artikel:%v\n", rec)
 		bodecsv.Write(rec)
 	}
-}
+	bodecsv.Flush()
 
-func checkErr(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
 }
