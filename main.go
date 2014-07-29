@@ -14,6 +14,7 @@ var (
 
 type Artikel struct {
 	ArtNr, Preis int
+	Name         string
 	Kategorie    string
 }
 
@@ -68,9 +69,11 @@ func main() {
 
 	for a := range artikels {
 		rec := []string{
+			a.Kategorie,
+			a.Name,
 			strconv.Itoa(a.ArtNr),
 			strconv.Itoa(a.Preis),
-			a.Kategorie}
+		}
 		log.Printf("Artikel:%v\n", rec)
 		bodecsv.Write(rec)
 	}
