@@ -22,7 +22,7 @@ func loginAndGetWarengruppen(user, passw string) (<-chan string, *http.Client, e
 		return nil, nil, err
 	}
 
-	client := &http.Client{nil, nil, jar}
+	client := &http.Client{Jar: jar}
 
 	// try to log in
 	loginCreds := url.Values{
@@ -37,7 +37,7 @@ func loginAndGetWarengruppen(user, passw string) (<-chan string, *http.Client, e
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, nil, fmt.Errorf("Login Status Code: %v\n", resp.StatusCode)
 	}
 
