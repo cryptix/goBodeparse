@@ -49,9 +49,9 @@ func main() {
 	}
 	log.Printf("Logged in!\n")
 
-	workerChans := make([]<-chan Artikel, 4)
-
-	for i := 0; i < 4; i++ {
+	workerCnt := 10
+	workerChans := make([]<-chan Artikel, workerCnt)
+	for i := 0; i < workerCnt; i++ {
 		workerChans[i] = kategorieWorker(client, jobs)
 	}
 
