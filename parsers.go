@@ -10,6 +10,47 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+func parseGebindeMenge(geb string) (gebinde int, menge, einheit string) {
+	state := 0
+	start := 0
+	gebinde = 0
+	var err error
+
+	for i, c := range geb {
+		switch state {
+		case 0:
+			if c == '/' {
+				gebinde, err = strconv.Atoi(geb[:i])
+				if err != nil {
+					// log.Printf("KatWorker[%s] Artikel[%s] Error:%s", kat, artikel, err)
+					log.Printf("Error parsing Gebinde %s: %s", geb[:i], err)
+					return
+				}
+
+				state = 1
+				start = i + 1
+			}
+
+			if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+				gebinde = 1
+				menge = geb[start:i]
+				einheit = geb[i:]
+
+				return
+			}
+		case 1:
+			if (c < '0' || c > '9') && c != ',' && c != '.' {
+				menge = geb[start:i]
+				einheit = geb[i:]
+
+				return
+			}
+		}
+	}
+
+	return
+}
+
 func kategorieWorker(client *http.Client, jobs <-chan string) <-chan Artikel {
 
 	out := make(chan Artikel)
@@ -53,11 +94,19 @@ func kategorieWorker(client *http.Client, jobs <-chan string) <-chan Artikel {
 					return
 				}
 
+				if artnrStr[:2] == "70" {
+					log.Printf("KatWorker[%s] Artikel[%s] Single Article, skip.\n", kat, artikel)
+					return
+				}
+
 				artnr, err := strconv.Atoi(artnrStr)
 				if err != nil {
 					log.Printf("KatWorker[%s] Artikel[%s] Error:%s", kat, artikel, err)
 					return
 				}
+
+				rawGebinde := s.Find(".spalteArtikel2").Text()
+				gebinde, menge, einheit := parseGebindeMenge(rawGebinde)
 
 				// ugly hack because bode remove the class ".spalteArtikel3"
 				subSel := s.Find("td")
@@ -90,9 +139,12 @@ func kategorieWorker(client *http.Client, jobs <-chan string) <-chan Artikel {
 
 				out <- Artikel{
 					Kategorie: kat,
-					Name:      artikel,
+					Name:      artikel[:paranLeft-2],
 					ArtNr:     artnr,
 					Preis:     hunderter*100 + zehner,
+					GebindeGr: gebinde,
+					Menge:     menge,
+					Einheit:   einheit,
 				}
 			})
 		}
