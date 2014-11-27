@@ -16,6 +16,9 @@ type Artikel struct {
 	ArtNr, Preis int
 	Name         string
 	Kategorie    string
+	GebindeGr    int
+	Menge        string
+	Einheit      string
 }
 
 func mergeWorkers(cs ...<-chan Artikel) <-chan Artikel {
@@ -71,10 +74,13 @@ func main() {
 		rec := []string{
 			a.Kategorie,
 			a.Name,
+			strconv.Itoa(a.GebindeGr),
+			a.Menge,
+			a.Einheit,
 			strconv.Itoa(a.ArtNr),
 			strconv.Itoa(a.Preis),
 		}
-		log.Printf("Artikel:%v\n", rec)
+		// log.Printf("Artikel:%v\n", rec)
 		bodecsv.Write(rec)
 	}
 	bodecsv.Flush()
