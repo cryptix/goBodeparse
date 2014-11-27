@@ -94,8 +94,14 @@ func kategorieWorker(client *http.Client, jobs <-chan string) <-chan Artikel {
 					return
 				}
 
+				if len(artnrStr) < 2 {
+					log.Printf("KatWorker[%s] Artikel[%s] article nr looks weird, skip.\n", kat, artikel)
+
+					return
+				}
+
 				if artnrStr[:2] == "70" {
-					log.Printf("KatWorker[%s] Artikel[%s] Single Article, skip.\n", kat, artikel)
+					// single article, skip.
 					return
 				}
 
@@ -120,7 +126,7 @@ func kategorieWorker(client *http.Client, jobs <-chan string) <-chan Artikel {
 				// split preis by the decimal poin
 				preisParts := strings.Split(preis, ".")
 				if len(preisParts) != 2 {
-					log.Printf("len(preisPart) != 2 ! %v\n", preis)
+					log.Printf("len(preisPart) != 2 ! %v\n", preis, "(found at", artikel, ")")
 					return
 				}
 

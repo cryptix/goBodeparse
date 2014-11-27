@@ -80,7 +80,7 @@ func main() {
 			strconv.Itoa(a.ArtNr),
 			strconv.Itoa(a.Preis),
 		}
-		log.Printf("Artikel:%v\n", rec)
+		// log.Printf("Artikel:%v\n", rec)
 		bodecsv.Write(rec)
 	}
 	bodecsv.Flush()
